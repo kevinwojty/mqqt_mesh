@@ -1,0 +1,12 @@
+eclipse.preferences.version=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/BATCH_BUILD/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/BATCH_BUILD/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/BATCH_BUILD/value=1
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/MDF_PATH/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/MDF_PATH/operation=append
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/MDF_PATH/value=C\:\\msys32\\home\\kevin\\esp\\esp-mdf
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/PATH/delimiter=;
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/PATH/operation=replace
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/PATH/value=C\:/Program Files/Java/jdk-13.0.1/bin/server;C\:/Program Files/Java/jdk-13.0.1/bin;C\:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath;C\:\\WINDOWS\\system32;C\:\\WINDOWS;C\:\\WINDOWS\\System32\\Wbem;C\:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C\:\\WINDOWS\\System32\\OpenSSH\\;C\:\\Program Files\\Calibre2\\;C\:\\Program Files\\MATLAB\\R2014a\\runtime\\win64;C\:\\Program Files\\MATLAB\\R2014a\\bin;C\:\\Program Files\\MATLAB\\R2014a\\polyspace\\bin;C\:\\Program Files\\Git\\cmd;C\:\\Program Files\\Microsoft VS Code\\bin;C\:\\Users\\kevin\\AppData\\Local\\Programs\\Python\\Python38-32\\Scripts\\;C\:\\Users\\kevin\\AppData\\Local\\Programs\\Python\\Python38-32\\;C\:\\Users\\kevin\\AppData\\Local\\Microsoft\\WindowsApps;C\:\\Program Files\\Microsoft VS Code\\bin;C\:\\Users\\kevin\\AppData\\Local\\Microsoft\\WindowsApps;;C\:\\Users\\kevin\\eclipse\\cpp-2019-12\\eclipse;C\:\\msys32\\mingw32\\bin;C\:\\msys32\\opt\\xtensa-esp32-elf\\bin;C\:\\msys32\\usr\\bin
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/append=true
+environment/project/cdt.managedbuild.toolchain.gnu.cross.base.646327896/appendContributed=true
