@@ -29,7 +29,7 @@
             			
             <storageModule moduleId="cdtBuildSystem" version="4.0.0">
                 				
-                <configuration buildProperties="" description="" id="cdt.managedbuild.toolchain.gnu.cross.base.646327896" name="Default" optionalBuildProperties="" parent="org.eclipse.cdt.build.core.emptycfg">
+                <configuration artifactName="${ProjName}" buildProperties="" description="" id="cdt.managedbuild.toolchain.gnu.cross.base.646327896" name="Default" optionalBuildProperties="org.eclipse.cdt.docker.launcher.containerbuild.property.selectedvolumes=,org.eclipse.cdt.docker.launcher.containerbuild.property.volumes=" parent="org.eclipse.cdt.build.core.emptycfg">
                     					
                     <folderInfo id="cdt.managedbuild.toolchain.gnu.cross.base.646327896.17899104" name="/" resourcePath="">
                         						
@@ -52,6 +52,10 @@
                                     <listOptionValue builtIn="false" value="&quot;C:\msys32\home\kevin\esp\esp-mdf\components\mwifi\include&quot;"/>
                                     									
                                     <listOptionValue builtIn="false" value="&quot;C:\msys32\home\kevin\esp\esp-mdf\components\mcommon\include&quot;"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="&quot;${workspace_loc:/mqtt_example/headers}&quot;"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="&quot;${workspace_loc:/mqtt_example/components/mesh_mqtt_handle/include}&quot;"/>
                                     								
                                 </option>
                                 								
