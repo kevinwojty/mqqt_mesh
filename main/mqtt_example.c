@@ -17,25 +17,20 @@
 #include "mesh_mqtt_handle.h"
 #include "../headers/Mqtt_intr_cb.h"
 
-const char *CUARTO = "cuarto";
 const char *CONFIG_BROKER_URL ="mqtt://chuka:75fee8844a354e30a3d8b1ac2c5d375c@io.adafruit.com";
 
 const char *TAG = "mesh";
+
 
 void LectPir (void *pvParameter);
 
 // #define MEMORY_DEBUG
 
-#define PIR_PIN GPIO_NUM_13
-#define GPIO_INPUT_PIN_SEL  (1ULL<<PIR_PIN)
-#define LED_BUILT_IN GPIO_NUM_2
-#define GPIO_OUTPUT_PIN_SEL  (1ULL<<LED_BUILT_IN)
-
-
+char *CUARTO = "cuarto";
 SemaphoreHandle_t pir_sem, alarma_onoff_sem;
-
 esp_mqtt_client_handle_t clientAdafruit;
 
+/*
 static bool addrs_remove(uint8_t *addrs_list, size_t *addrs_num, const uint8_t *addr)
 {
     for (int i = 0; i < *addrs_num; i++, addrs_list += MWIFI_ADDR_LEN) {
@@ -50,78 +45,44 @@ static bool addrs_remove(uint8_t *addrs_list, size_t *addrs_num, const uint8_t *
 
     return false;
 }
-
+*/
 void root_write_task(void *arg)
 {
     mdf_err_t ret = MDF_OK;
-    char *data    = NULL;
+    char *rcv    = MDF_MALLOC(MWIFI_PAYLOAD_LEN);
     size_t size   = MWIFI_PAYLOAD_LEN;
     uint8_t src_addr[MWIFI_ADDR_LEN] = {0x0};
     mwifi_data_type_t data_type      = {0x0};
+    node_msj data;
+
+    const char s[2] = ",";
 
     MDF_LOGI("Root write task is running");
 
-    while (mwifi_is_connected() && esp_mesh_get_layer() == MESH_ROOT) {
-        /*if (!mesh_mqtt_is_connect()) {
-            vTaskDelay(500 / portTICK_RATE_MS);
-            continue;
-        }*/
-
+    while (mwifi_is_connected() && esp_mesh_get_layer() == MESH_ROOT)
+    {
         /**
          * @brief Recv data from node, and forward to mqtt server.
          */
-        ret = mwifi_root_read(src_addr, &data_type, &data, &size, portMAX_DELAY);
-        MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_read", mdf_err_to_name(ret));
+        memset(rcv, 0, MWIFI_PAYLOAD_LEN);
+        ret = mwifi_root_read(src_addr, &data_type, rcv, &size, portMAX_DELAY);
 
-        esp_mqtt_client_publish(clientAdafruit, TOPIC2, data, 0, 1, 0);
+        //Separo los campos que me enviaron separados por comas
+        data.cuarto = strtok(rcv, s);
+        data.topic = strtok(NULL, s);
+        data.msj = strtok(NULL, s);
 
-        /*
-        ret = mesh_mqtt_write(src_addr, data, size);
-        MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mesh_mqtt_publish", mdf_err_to_name(ret));
-		*/
-MEM_FREE:
-        MDF_FREE(data);
+        if(strcmp(data.topic,TOPIC2) == 0)
+        {
+        	char alarma[50] = "Alarma en: ";
+
+			strcpy(alarma,data.cuarto);
+			esp_mqtt_client_publish(clientAdafruit, data.topic , alarma, 0, 1, 0);
+        }
     }
 
     MDF_LOGW("Root write task is exit");
-    //mesh_mqtt_stop();
-    vTaskDelete(NULL);
-}
-
-void root_read_task(void *arg)
-{
-    mdf_err_t ret = MDF_OK;
-    char *data    = NULL;
-    size_t size   = MWIFI_PAYLOAD_LEN;
-    uint8_t dest_addr[MWIFI_ADDR_LEN] = {0x0};
-    mwifi_data_type_t data_type       = {0x0};
-
-    MDF_LOGI("Root read task is running");
-
-    while (mwifi_is_connected() && esp_mesh_get_layer() == MESH_ROOT)
-    {
-        if (!mesh_mqtt_is_connect())
-        {
-            vTaskDelay(500 / portTICK_RATE_MS);
-            continue;
-        }
-
-        /**
-         * @brief Recv data from mqtt data queue, and forward to special device.
-
-        ret = mesh_mqtt_read(dest_addr, (void **)&data, &size, 500 / portTICK_PERIOD_MS);
-        MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "");
-         */
-
-        ret = mwifi_root_write(dest_addr, 1, &data_type, data, size, true);
-        MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
-
-MEM_FREE:
-        MDF_FREE(data);
-    }
-
-    MDF_LOGW("Root read task is exit");
-    //mesh_mqtt_stop();
+	esp_mqtt_client_stop(clientAdafruit);
     vTaskDelete(NULL);
 }
 
@@ -148,7 +109,7 @@ static void node_read_task(void *arg)
         ret = mwifi_read(src_addr, &data_type, data, &size, portMAX_DELAY);
         MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
         MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %s", MAC2STR(src_addr), size, data);
-        xSemaphoreTake(alarma_onoff_sem,portMAX_DELAY); //Dejo el led cte PRUEBA
+        //xSemaphoreTake(alarma_onoff_sem,portMAX_DELAY); //Dejo el led cte PRUEBA
     }
 
     MDF_LOGW("Node read task is exit");
@@ -247,9 +208,19 @@ void LectPir (void *pvParameter)
         {
             gpio_isr_handler_remove(PIR_PIN);//evito que vuelva a llamarme el pir dentro de los 30 seg
             xSemaphoreGive(alarma_onoff_sem);
-            size = asprintf(&data, "{\"topic\": \"AlarmaDisparada\",\"disparada\":\"%s\"}",CUARTO);
-            MDF_LOGD("Node send, size: %d, data: %s", size, data);
-            mwifi_write(NULL, &data_type, data, size, true);
+
+            if(esp_mesh_is_root())	//si soy root envio por mesh caso contrario le envio al root el msj
+            {
+            	char alarma[50] = "Alarma en: ";
+    			strcpy(alarma,CUARTO);
+    			esp_mqtt_client_publish(clientAdafruit, TOPIC2 , alarma, 0, 1, 0);
+
+            }
+            else
+            {
+                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC2,"no hay msj");
+                while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
+            }
             MDF_FREE(data);
             vTaskDelay(30000 / portTICK_RATE_MS);
             gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);   //habilito nuevamente el pir
@@ -324,7 +295,7 @@ void app_main()
      */
 
     xSemaphoreTake(pir_sem,100 / portTICK_RATE_MS);     //por seguridad,segun documentacion empieza tomado
-    //xSemaphoreTake(alarma_onoff_sem,100 / portTICK_RATE_MS);
+    xSemaphoreTake(alarma_onoff_sem,100 / portTICK_RATE_MS);
 
     if(pir_sem == NULL || alarma_onoff_sem == NULL)
     {
@@ -334,14 +305,8 @@ void app_main()
 //    xTaskCreate(node_write_task, "node_write_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
 	xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
 
+	gpio_set_level(LED_BUILT_IN,1);
+
     xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,2,NULL );
     xTaskCreate(&Postled, "Postled", 2048,NULL,1,NULL );
-
-    //TimerHandle_t timer = xTimerCreate("print_system_info", 10000 / portTICK_RATE_MS,true, NULL, print_system_info_timercb);
-    //xTimerStart(timer, 0);
-
-    gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
-    gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);//Prueba temporal
-    xSemaphoreGive(alarma_onoff_sem); 	//Prueba temporal
-
 }

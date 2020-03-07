@@ -15,6 +15,7 @@ const char *TAG2 = "mqtt_adafruit";
 extern const char *TAG;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern SemaphoreHandle_t pir_sem,alarma_onoff_sem;
+extern char *CUARTO;
 
 esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 {
@@ -23,7 +24,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
     char *aux_topic,*aux_data;
     mdf_err_t ret = MDF_OK;
     mwifi_data_type_t data_type = {0x0};
-    char *data    = NULL;
+    //char *data    = NULL;
     uint8_t dest_addr[MWIFI_ADDR_LEN] = MWIFI_ADDR_BROADCAST;
 
     // your_context_t *context = event->context;
@@ -59,37 +60,54 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 
             //Analizo la información que llego
             asprintf(&aux_topic,"%.*s",event->topic_len, event->topic);
+            asprintf(&aux_data,"%.*s",event->data_len, event->data);
+
             /**
              * @brief Send mqtt server information to nodes throught root node.
              */
-            if(strcmp(aux_topic,TOPIC1)==0)
+            if(strcmp(aux_topic,TOPIC1)==0)	//si es que se activo alguna alarma se la envio a todos
             {
-                MDF_LOGD("Node send, size: %d, data: %s", event->data_len, event->data);
+            	char *temp_on = NULL,*temp_off = NULL;
 
-                ret = mwifi_root_write(dest_addr, 1, &data_type, event->data, event->data_len, true);
-                MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
+            	MDF_LOGD("Node send, size: %d, data: %s", event->data_len,aux_data);
 
-MEM_FREE:
-		MDF_FREE(data);
+            	temp_on = MDF_MALLOC(sizeof(char)*25);
+            	temp_off = MDF_MALLOC(sizeof(char)*25);
 
-				//xSemaphoreTake(alarma_onoff_sem,portMAX_DELAY); //Dejo el led cte PRUEBA
+            	strcpy(temp_on,CUARTO);
+            	strcat(temp_on," ON");
+            	strcpy(temp_off,CUARTO);
+            	strcat(temp_off," OFF");
 
-                /*
-                if(strcmp(aux_data,CUARTO " ON") == 0)
+            	MDF_LOGD("Node send, size: %s, data: %s", temp_on,aux_data);
+
+
+                if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
-                    xSemaphoreGive(alarma_onoff_sem);
-                    //Agrego la interrupción para un pin en particular del GPIO
-                    gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
-                    xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
+						xSemaphoreGive(alarma_onoff_sem);
+						//Agrego la interrupción para un pin en particular del GPIO
+						gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+						//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
                 }
-                if(strcmp(aux_data,CUARTO " OFF") == 0)
-                {
-                    gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
-                    xSemaphoreTake(alarma_onoff_sem,1); //si ya esta apagado que no sea bloqueante
-                }*/
+                else if(strcmp(aux_data,temp_off) == 0)
+				{
+					gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
+					xSemaphoreTake(alarma_onoff_sem,(TickType_t)1); //si ya esta apagado que no sea bloqueante
+				}
+            	else	//caso que no sea se lo re envio a los nodos
+            	{
+            		mwifi_root_write(dest_addr, 1, &data_type, event->data, event->data_len, true);
+            		//MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
+            	}
+        		free(temp_on);
+        		free(temp_off);
+
+//MEM_FREE:
+		//MDF_FREE(data);
             }   //Si es movimiento no hago nada ya que yo envie la notificacion
 
             MDF_FREE(aux_topic);
+            MDF_FREE(aux_data);
 
             break;
         case MQTT_EVENT_ERROR:
@@ -113,44 +131,7 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
     }
 }
 
-/**
- * @brief Timed printing system information
- */
-void print_system_info_timercb(void *timer)
-{
-    uint8_t primary                 = 0;
-    wifi_second_chan_t second       = 0;
-    mesh_addr_t parent_bssid        = {0};
-    uint8_t sta_mac[MWIFI_ADDR_LEN] = {0};
-    mesh_assoc_t mesh_assoc         = {0x0};
-    wifi_sta_list_t wifi_sta_list   = {0x0};
 
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, sta_mac);
-    esp_wifi_ap_get_sta_list(&wifi_sta_list);
-    esp_wifi_get_channel(&primary, &second);
-    esp_wifi_vnd_mesh_get(&mesh_assoc);
-    esp_mesh_get_parent_bssid(&parent_bssid);
-
-    MDF_LOGI("System information, channel: %d, layer: %d, self mac: " MACSTR ", parent bssid: " MACSTR
-             ", parent rssi: %d, node num: %d, free heap: %u", primary,
-             esp_mesh_get_layer(), MAC2STR(sta_mac), MAC2STR(parent_bssid.addr),
-             mesh_assoc.rssi, esp_mesh_get_total_node_num(), esp_get_free_heap_size());
-
-    for (int i = 0; i < wifi_sta_list.num; i++) {
-        MDF_LOGI("Child mac: " MACSTR, MAC2STR(wifi_sta_list.sta[i].mac));
-    }
-
-#ifdef MEMORY_DEBUG
-
-    if (!heap_caps_check_integrity_all(true)) {
-        MDF_LOGE("At least one heap is corrupt");
-    }
-
-    mdf_mem_print_heap();
-    mdf_mem_print_record();
-    mdf_mem_print_task();
-#endif /**< MEMORY_DEBUG */
-}
 
 /**
  * @brief All module events will be sent to this task in esp-mdf
@@ -179,106 +160,32 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
             if (esp_mesh_is_root()) {
             	esp_mqtt_client_stop(clientAdafruit);
-            	//mesh_mqtt_stop();
             }
 
             break;
 
         case MDF_EVENT_MWIFI_ROUTING_TABLE_ADD:
             MDF_LOGI("MDF_EVENT_MWIFI_ROUTING_TABLE_ADD, total_num: %d", esp_mesh_get_total_node_num());
-/*
-            if (esp_mesh_is_root()) {
-
-
-                // @brief find new add device.
-
-                node_list.change_num  = esp_mesh_get_routing_table_size();
-                node_list.change_list = MDF_MALLOC(node_list.change_num * sizeof(mesh_addr_t));
-                ESP_ERROR_CHECK(esp_mesh_get_routing_table((mesh_addr_t *)node_list.change_list,
-                                node_list.change_num * sizeof(mesh_addr_t), (int *)&node_list.change_num));
-
-                for (int i = 0; i < node_list.last_num; ++i) {
-                    addrs_remove(node_list.change_list, &node_list.change_num, node_list.last_list + i * MWIFI_ADDR_LEN);
-                }
-
-                node_list.last_list = MDF_REALLOC(node_list.last_list,
-                                                  (node_list.change_num + node_list.last_num) * MWIFI_ADDR_LEN);
-                memcpy(node_list.last_list + node_list.last_num * MWIFI_ADDR_LEN,
-                       node_list.change_list, node_list.change_num * MWIFI_ADDR_LEN);
-                node_list.last_num += node_list.change_num;
-
-
-                // @brief subscribe topic for new node
-
-                MDF_LOGI("total_num: %d, add_num: %d", node_list.last_num, node_list.change_num);
-                mesh_mqtt_subscribe(node_list.change_list, node_list.change_num);
-                MDF_FREE(node_list.change_list);
-            }
-*/
             break;
 
         case MDF_EVENT_MWIFI_ROUTING_TABLE_REMOVE:
             MDF_LOGI("MDF_EVENT_MWIFI_ROUTING_TABLE_REMOVE, total_num: %d", esp_mesh_get_total_node_num());
-/*
-            if (esp_mesh_is_root()) {
-
-                // @brief find removed device.
-
-                size_t table_size      = esp_mesh_get_routing_table_size();
-                uint8_t *routing_table = MDF_MALLOC(table_size * sizeof(mesh_addr_t));
-                ESP_ERROR_CHECK(esp_mesh_get_routing_table((mesh_addr_t *)routing_table,
-                                table_size * sizeof(mesh_addr_t), (int *)&table_size));
-
-                for (int i = 0; i < table_size; ++i) {
-                    addrs_remove(node_list.last_list, &node_list.last_num, routing_table + i * MWIFI_ADDR_LEN);
-                }
-
-                node_list.change_num  = node_list.last_num;
-                node_list.change_list = MDF_MALLOC(node_list.last_num * MWIFI_ADDR_LEN);
-                memcpy(node_list.change_list, node_list.last_list, node_list.change_num * MWIFI_ADDR_LEN);
-
-                node_list.last_num  = table_size;
-                memcpy(node_list.last_list, routing_table, table_size * MWIFI_ADDR_LEN);
-                MDF_FREE(routing_table);
-
-
-                // @brief unsubscribe topic for leaved node
-
-                MDF_LOGI("total_num: %d, add_num: %d", node_list.last_num, node_list.change_num);
-                mesh_mqtt_unsubscribe(node_list.change_list, node_list.change_num);
-                MDF_FREE(node_list.change_list);
-            }
-*/
             break;
 
         case MDF_EVENT_MWIFI_ROOT_GOT_IP: {
 
             MDF_LOGI("Root obtains the IP address. It is posted by LwIP stack automatically");
 
-            mqtt_app_start();
-/*
-            mesh_mqtt_start(CONFIG_MQTT_URL);
-
-
-             // @brief subscribe topic for all subnode
-
-            size_t table_size      = esp_mesh_get_routing_table_size();
-            uint8_t *routing_table = MDF_MALLOC(table_size * sizeof(mesh_addr_t));
-            ESP_ERROR_CHECK(esp_mesh_get_routing_table((mesh_addr_t *)routing_table,
-                            table_size * sizeof(mesh_addr_t), (int *)&table_size));
-
-            node_list.last_num  = table_size;
-            node_list.last_list = MDF_REALLOC(node_list.last_list,
-                                              node_list.last_num * MWIFI_ADDR_LEN);
-            memcpy(node_list.last_list, routing_table, table_size * MWIFI_ADDR_LEN);
-            MDF_FREE(routing_table);
-
-            MDF_LOGI("subscribe %d node", node_list.last_num);
-            mesh_mqtt_subscribe(node_list.last_list, node_list.last_num);
-            MDF_FREE(node_list.change_list);
-*/
-            xTaskCreate(root_write_task, "root_write", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-            //xTaskCreate(root_read_task, "root_read", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL) //PRUEBA
+            //gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
+            /*gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);//Prueba temporal
+            xSemaphoreGive(alarma_onoff_sem); 	//Prueba temporal
+			*/
+            if (esp_mesh_is_root())
+            {
+            	mqtt_app_start();
+                xTaskCreate(root_write_task, "root_write", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
+				//xTaskCreate(root_read_task, "root_read", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL) //PRUEBA
+            }
             break;
         }
 

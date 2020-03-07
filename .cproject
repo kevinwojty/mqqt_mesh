@@ -56,6 +56,8 @@
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/mqtt_example/headers}&quot;"/>
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/mqtt_example/components/mesh_mqtt_handle/include}&quot;"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="&quot;${workspace_loc:/mqtt_example/jasmine_json}&quot;"/>
                                     								
                                 </option>
                                 								
