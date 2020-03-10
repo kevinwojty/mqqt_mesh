@@ -20,32 +20,16 @@
 const char *CONFIG_BROKER_URL ="mqtt://chuka:75fee8844a354e30a3d8b1ac2c5d375c@io.adafruit.com";
 
 const char *TAG = "mesh";
-
+extern const char *TAG2;
 
 void LectPir (void *pvParameter);
 
 // #define MEMORY_DEBUG
 
-char *CUARTO = "cuarto";
+char *CUARTO = "comedor";
 SemaphoreHandle_t pir_sem, alarma_onoff_sem;
 esp_mqtt_client_handle_t clientAdafruit;
 
-/*
-static bool addrs_remove(uint8_t *addrs_list, size_t *addrs_num, const uint8_t *addr)
-{
-    for (int i = 0; i < *addrs_num; i++, addrs_list += MWIFI_ADDR_LEN) {
-        if (!memcmp(addrs_list, addr, MWIFI_ADDR_LEN)) {
-            if (--(*addrs_num)) {
-                memcpy(addrs_list, addrs_list + MWIFI_ADDR_LEN, (*addrs_num - i) * MWIFI_ADDR_LEN);
-            }
-
-            return true;
-        }
-    }
-
-    return false;
-}
-*/
 void root_write_task(void *arg)
 {
     mdf_err_t ret = MDF_OK;
@@ -74,9 +58,9 @@ void root_write_task(void *arg)
 
         if(strcmp(data.topic,TOPIC2) == 0)
         {
-        	char alarma[50] = "Alarma en: ";
+        	char alarma[30] = "Alarma en: ";
 
-			strcpy(alarma,data.cuarto);
+			strcat(alarma,data.cuarto);
 			esp_mqtt_client_publish(clientAdafruit, data.topic , alarma, 0, 1, 0);
         }
     }
@@ -109,6 +93,36 @@ static void node_read_task(void *arg)
         ret = mwifi_read(src_addr, &data_type, data, &size, portMAX_DELAY);
         MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
         MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %s", MAC2STR(src_addr), size, data);
+
+        //if(strcmp(aux_topic,TOPIC1)==0)	//si es que se activo alguna alarma se la envio a todos
+        //{
+        	char *temp_on = NULL,*temp_off = NULL;
+
+        	temp_on = MDF_MALLOC(sizeof(char)*25);
+        	temp_off = MDF_MALLOC(sizeof(char)*25);
+
+        	strcpy(temp_on,CUARTO);
+        	strcat(temp_on," ON");
+        	strcpy(temp_off,CUARTO);
+        	strcat(temp_off," OFF");
+
+            if(strcmp(data,temp_on) == 0)
+            {
+					xSemaphoreGive(alarma_onoff_sem);
+					//Agrego la interrupción para un pin en particular del GPIO
+					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
+            }
+            else if(strcmp(data,temp_off) == 0)
+			{
+				gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
+				xSemaphoreTake(alarma_onoff_sem,(TickType_t)1); //si ya esta apagado que no sea bloqueante
+			}
+
+    		free(temp_on);
+    		free(temp_off);
+           //Si es movimiento no hago nada ya que yo envie la notificacion
+
         //xSemaphoreTake(alarma_onoff_sem,portMAX_DELAY); //Dejo el led cte PRUEBA
     }
 
@@ -116,44 +130,6 @@ static void node_read_task(void *arg)
     MDF_FREE(data);
     vTaskDelete(NULL);
 }
-
-static void node_write_task(void *arg)
-{
-    mdf_err_t ret = MDF_OK;
-    int count     = 0;
-    size_t size   = 0;
-    char *data    = NULL;
-    mwifi_data_type_t data_type     = {0x0};
-    uint8_t sta_mac[MWIFI_ADDR_LEN] = {0};
-
-    MDF_LOGI("Node task is running");
-
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, sta_mac);
-
-    for (;;) {
-        if (!mwifi_is_connected() || !mwifi_get_root_status()) {
-            vTaskDelay(500 / portTICK_RATE_MS);
-            continue;
-        }
-
-        /**
-         * @brief Send device information to mqtt server throught root node.
-         */
-        size = asprintf(&data, "{\"mac\": \"%02x%02x%02x%02x%02x%02x\", \"seq\":%d,\"layer\":%d}",
-                        MAC2STR(sta_mac), count++, esp_mesh_get_layer());
-
-        MDF_LOGD("Node send, size: %d, data: %s", size, data);
-        ret = mwifi_write(NULL, &data_type, data, size, true);
-        MDF_FREE(data);
-        MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_write", mdf_err_to_name(ret));
-
-        vTaskDelay(3000 / portTICK_RATE_MS);
-    }
-
-    MDF_LOGW("Node task is exit");
-    vTaskDelete(NULL);
-}
-
 
 
 static mdf_err_t wifi_init()
@@ -209,17 +185,18 @@ void LectPir (void *pvParameter)
             gpio_isr_handler_remove(PIR_PIN);//evito que vuelva a llamarme el pir dentro de los 30 seg
             xSemaphoreGive(alarma_onoff_sem);
 
-            if(esp_mesh_is_root())	//si soy root envio por mesh caso contrario le envio al root el msj
+            if(esp_mesh_is_root())	//si soy root envio por wifi caso contrario le envio al root el msj
             {
-            	char alarma[50] = "Alarma en: ";
-    			strcpy(alarma,CUARTO);
+            	char alarma[30] = "Alarma en: ";
+    			strcat(alarma,CUARTO);
     			esp_mqtt_client_publish(clientAdafruit, TOPIC2 , alarma, 0, 1, 0);
-
+    			ESP_LOGI(TAG2, "Publicado: %s",alarma);
             }
             else
             {
                 size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC2,"no hay msj");
                 while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
+                MDF_LOGI("Enviado: %s",data);
             }
             MDF_FREE(data);
             vTaskDelay(30000 / portTICK_RATE_MS);
@@ -302,11 +279,8 @@ void app_main()
         ESP_LOGE(TAG, "No se pudo inicializar el semaforo");
         esp_restart();
     }
-//    xTaskCreate(node_write_task, "node_write_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-	xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
 
-	gpio_set_level(LED_BUILT_IN,1);
-
+    xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
     xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,2,NULL );
     xTaskCreate(&Postled, "Postled", 2048,NULL,1,NULL );
 }

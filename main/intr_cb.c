@@ -79,9 +79,6 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             	strcpy(temp_off,CUARTO);
             	strcat(temp_off," OFF");
 
-            	MDF_LOGD("Node send, size: %s, data: %s", temp_on,aux_data);
-
-
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
 						xSemaphoreGive(alarma_onoff_sem);
@@ -152,11 +149,11 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
             break;
 
         case MDF_EVENT_MWIFI_PARENT_CONNECTED:
-            MDF_LOGI("Parent is connected on station interface");
+            MDF_LOGI("Parent is connected on station interface");	//aca entra cuando vuelve a conectarse a su padre
             break;
 
         case MDF_EVENT_MWIFI_PARENT_DISCONNECTED:
-            MDF_LOGI("Parent is disconnected on station interface");
+            MDF_LOGI("Parent is disconnected on station interface"); //aca entra cuando se desconecta el padre
 
             if (esp_mesh_is_root()) {
             	esp_mqtt_client_stop(clientAdafruit);
@@ -176,15 +173,12 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
             MDF_LOGI("Root obtains the IP address. It is posted by LwIP stack automatically");
 
-            //gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
-            /*gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);//Prueba temporal
-            xSemaphoreGive(alarma_onoff_sem); 	//Prueba temporal
-			*/
+            gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
+
             if (esp_mesh_is_root())
             {
             	mqtt_app_start();
                 xTaskCreate(root_write_task, "root_write", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-				//xTaskCreate(root_read_task, "root_read", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL) //PRUEBA
             }
             break;
         }
