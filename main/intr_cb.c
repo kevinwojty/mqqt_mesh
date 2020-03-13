@@ -9,10 +9,11 @@
 #include "mwifi.h"
 #include "mesh_mqtt_handle.h"
 #include "../headers/Mqtt_intr_cb.h"
+#include "mconfig_blufi.h"
 
-const char *TAG2 = "mqtt_adafruit";
 
 extern const char *TAG;
+extern const char *TAG2;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern SemaphoreHandle_t pir_sem,alarma_onoff_sem;
 extern char *CUARTO;
@@ -128,8 +129,6 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
     }
 }
 
-
-
 /**
  * @brief All module events will be sent to this task in esp-mdf
  *
@@ -182,6 +181,24 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
             }
             break;
         }
+
+        case MDF_EVENT_MCONFIG_BLUFI_CONNECTED:
+            MDF_LOGI("MDF_EVENT_MCONFIG_BLUFI_CONNECTED");
+            break;
+
+        case MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED:
+            MDF_LOGI("MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED");
+            break;
+
+		/**< Add a custom communication process */
+		case MDF_EVENT_MCONFIG_BLUFI_RECV: {
+			mconfig_blufi_data_t *blufi_data = (mconfig_blufi_data_t *)ctx;
+			MDF_LOGI("recv data: %.*s", blufi_data->size, blufi_data->data);
+
+			// ret = mconfig_blufi_send(blufi_data->data, blufi_data->size);
+			// MDF_ERROR_BREAK(ret != MDF_OK, "<%> mconfig_blufi_send", mdf_err_to_name(ret));
+			break;
+		}
 
         case MDF_EVENT_CUSTOM_MQTT_CONNECT:
             MDF_LOGI("MQTT connect");
