@@ -5,13 +5,18 @@
  *      Author: kevin
  */
 
-#include "mqtt.h"
+#include "mqtt_client.h"
+#include "../headers/mqtt.h"
+#include "../headers/Mqtt_intr_cb.h"
+
+extern const char *CONFIG_BROKER_URL;
+extern esp_mqtt_client_handle_t clientAdafruit;
 
 void get_last_value(esp_mqtt_client_handle_t client,char* topic)
 {
 	char* aux;
 
-	asprintf(aux, "%s/get",topic);
+	asprintf(&aux, "%s/get",topic);
 
 	esp_mqtt_client_publish(client, aux , "\0", 0, 1, 0);
 	free(aux);

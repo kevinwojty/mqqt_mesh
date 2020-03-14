@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <ctype.h>
 #include "mdf_common.h"
 #include "mwifi.h"
+#include "mqtt_client.h"
+#include "mdf_event_loop.h"
+#include "esp_bt.h"
 //#include "mesh_mqtt_handle.h"
 #include "../headers/Mqtt_intr_cb.h"
-#include "mqtt.h"
+#include "../headers/mqtt.h"
+#include "../headers/node.h"
+#include "../headers/mconfig.h"
 
 void LectPir (void *pvParameter);
 
@@ -26,7 +32,7 @@ const char *CONFIG_BROKER_URL ="mqtt://chuka:75fee8844a354e30a3d8b1ac2c5d375c@io
 const char *TAG = "mesh";
 const char *TAG2 = "mqtt_adafruit";
 
-char *CUARTO = "comedor";
+DRAM_ATTR char CUARTO[20] = "comedor";
 SemaphoreHandle_t pir_sem, alarma_onoff_sem;
 esp_mqtt_client_handle_t clientAdafruit;
 
@@ -105,6 +111,98 @@ void LectPir (void *pvParameter)
     vTaskDelete(NULL);
 }
 
+mdf_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
+{
+	nvs_handle my_handle;
+	esp_err_t err;
+
+	// Open
+	err = nvs_open("MWIFI_CONF", NVS_READONLY, &my_handle);
+	if (err != ESP_OK) return err;
+
+	// Read
+	size_t required_size;
+	err = nvs_get_str(my_handle,"router_ssid",cfg->router_ssid,&required_size);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	ESP_LOGI(TAG2,"Guardo router");
+
+	err = nvs_get_str(my_handle,"router_pass",cfg->router_password,&required_size);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	ESP_LOGI(TAG2,"Guardo router");
+
+	err = nvs_get_str(my_handle,"mesh_pass",cfg->mesh_password,&required_size);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	ESP_LOGI(TAG2,"Guardo router");
+
+	char *aux;
+
+	err = nvs_get_str(my_handle,"room",NULL,&required_size);
+	aux=malloc(sizeof(char)*(required_size+1));
+	err = nvs_get_str(my_handle,"room",aux,&required_size);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	strcpy(cuarto,aux);
+	free(aux);
+
+	ESP_LOGI(TAG2,"Guardo router");
+
+	size_t size = sizeof(cfg->mesh_id);
+	nvs_get_blob(my_handle, "mesh_id", cfg->mesh_id, &size);
+
+	ESP_LOGI(TAG2,"Guardo router");
+
+
+	// Close
+	nvs_close(my_handle);
+	return ESP_OK;
+}
+
+mdf_err_t set_mwifi_nvs (mwifi_config_t * cfg,char * cuarto)
+{
+	nvs_handle my_handle;
+	esp_err_t err;
+
+	// Open
+	err = nvs_open("MWIFI_CONF", NVS_READWRITE, &my_handle);
+	if (err != ESP_OK) return err;
+
+	// Write
+	err = nvs_set_str(my_handle,"router_ssid",cfg->router_ssid);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	err = nvs_set_str(my_handle,"router_pass",cfg->router_password);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+
+	err = nvs_set_str(my_handle,"mesh_pass",cfg->mesh_password);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	//char aux[30];
+
+	//strcpy(aux,cuarto);
+
+	err = nvs_set_str(my_handle,"room",cuarto);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+	size_t size = sizeof(cfg->mesh_id);
+	nvs_set_blob(my_handle, "mesh_id", cfg->mesh_id, size);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+    // Commit written value.
+    // After setting any values, nvs_commit() must be called to ensure changes are written
+    // to flash storage. Implementations may write to storage at other times,
+    // but this is not guaranteed.
+    err = nvs_commit(my_handle);
+    if (err != ESP_OK) return err;
+
+	// Close
+	nvs_close(my_handle);
+	return ESP_OK;
+}
+
 
 void app_main()
 {
@@ -139,11 +237,43 @@ void app_main()
     MDF_ERROR_ASSERT(esp_wifi_get_mac(ESP_IF_WIFI_STA, sta_mac));
     sprintf(name, "ESP-WIFI-MESH_%02x%02x", sta_mac[4], sta_mac[5]);
 
-    MDF_ERROR_ASSERT(get_network_config(name, &mwifi_config, custom_data));
+    //MDF_ERROR_ASSERT(get_network_config(name, &mwifi_config, custom_data));
+    get_network_config(name, &mwifi_config, custom_data);
 
-    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %.*s",
+    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
              mwifi_config.router_ssid, mwifi_config.router_password,
-             MAC2STR(mwifi_config.mesh_id), sizeof(custom_data), custom_data);
+             MAC2STR(mwifi_config.mesh_id), CUARTO);
+
+    if(strlen(custom_data)> 4)
+    {
+    	int k;
+    	strcpy(CUARTO,custom_data);
+    	for(k=0;k< strlen(CUARTO);k++)
+    		CUARTO[k] = tolower((int)CUARTO[k]);
+    	CUARTO[k] = 0;
+
+    	if (set_mwifi_nvs(&mwifi_config,CUARTO) != ESP_OK)
+    	{
+            ESP_LOGE(TAG, "No se pudo guardar datos en NVS");
+            nvs_flash_erase_partition("MWIFI_CONF");
+            esp_restart();
+    	}
+
+    }
+    else
+    {
+    	char cuarto_aux[30]={0};
+    	if (get_mwifi_nvs(&mwifi_config,cuarto_aux) != ESP_OK)
+    	{
+            ESP_LOGE(TAG, "No se pudo leer datos en NVS");
+            nvs_flash_erase_partition("MWIFI_CONF");
+            esp_restart();
+    	}
+    	strcpy(CUARTO,cuarto_aux);
+    }
+    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
+             mwifi_config.router_ssid, mwifi_config.router_password,
+             MAC2STR(mwifi_config.mesh_id), CUARTO);
 
     /**
      * @brief Note that once BT controller memory is released, the process cannot be reversed.
@@ -156,6 +286,13 @@ void app_main()
 	io_conf.mode = GPIO_MODE_INPUT;
 	io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
 	io_conf.pull_down_en = 1;
+	io_conf.pull_up_en = 0;
+	gpio_config(&io_conf);      //configure GPIO with the given settings
+
+    io_conf.intr_type = GPIO_PIN_INTR_NEGEDGE;
+	io_conf.mode = GPIO_MODE_INPUT;
+	io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL2;
+	io_conf.pull_down_en = 0;
 	io_conf.pull_up_en = 0;
 	gpio_config(&io_conf);      //configure GPIO with the given settings
 
@@ -187,4 +324,6 @@ void app_main()
     MDF_ERROR_ASSERT(mwifi_init(&cfg));
     MDF_ERROR_ASSERT(mwifi_set_config(&mwifi_config));
     MDF_ERROR_ASSERT(mwifi_start());
+
+
 }

@@ -7,7 +7,8 @@
 
 #include "mdf_common.h"
 #include "mwifi.h"
-#include "mesh_mqtt_handle.h"
+#include "mqtt_client.h"
+//#include "mesh_mqtt_handle.h"
 #include "../headers/Mqtt_intr_cb.h"
 #include "mconfig_blufi.h"
 
@@ -16,7 +17,7 @@ extern const char *TAG;
 extern const char *TAG2;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern SemaphoreHandle_t pir_sem,alarma_onoff_sem;
-extern char *CUARTO;
+extern DRAM_ATTR char CUARTO[20];
 
 esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 {
@@ -79,6 +80,8 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             	strcat(temp_on," ON");
             	strcpy(temp_off,CUARTO);
             	strcat(temp_off," OFF");
+
+            	ESP_LOGI(TAG2, "%s=%s",aux_data,temp_on);
 
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
@@ -199,7 +202,7 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 			// MDF_ERROR_BREAK(ret != MDF_OK, "<%> mconfig_blufi_send", mdf_err_to_name(ret));
 			break;
 		}
-
+/*
         case MDF_EVENT_CUSTOM_MQTT_CONNECT:
             MDF_LOGI("MQTT connect");
             mwifi_post_root_status(true);
@@ -209,7 +212,7 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
             MDF_LOGI("MQTT disconnected");
             mwifi_post_root_status(false);
             break;
-
+*/
         default:
             break;
     }

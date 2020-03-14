@@ -6,10 +6,15 @@
  */
 #include "mdf_common.h"
 #include "mwifi.h"
+#include "mqtt_client.h"
 //#include "mesh_mqtt_handle.h"
-#include "node.h"
+#include "../headers/node.h"
 #include "../headers/Mqtt_intr_cb.h"
 
+extern const char *TAG;
+extern SemaphoreHandle_t alarma_onoff_sem;
+extern esp_mqtt_client_handle_t clientAdafruit;
+extern char *CUARTO;
 
 void root_write_task(void *arg)
 {

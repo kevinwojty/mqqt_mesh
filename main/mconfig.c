@@ -7,8 +7,9 @@
 #include "mdf_common.h"
 #include "mconfig_blufi.h"
 #include "mwifi.h"
-#include "mconfig.h"
+#include "../headers/mconfig.h"
 
+extern const char *TAG;
 
 mdf_err_t get_network_config(const char *name, mwifi_config_t *mwifi_config, char custom_data[32])
 {
@@ -36,7 +37,13 @@ mdf_err_t get_network_config(const char *name, mwifi_config_t *mwifi_config, cha
      * @brief Get Network configuration information from blufi or network configuration chain.
      *      When blufi or network configuration chain complete, will send configuration information to config_queue.
      */
-    MDF_ERROR_ASSERT(mconfig_queue_read(&mconfig_data, portMAX_DELAY));
+    //MDF_ERROR_ASSERT(mconfig_queue_read(&mconfig_data, 60000 / portTICK_RATE_MS));
+    if(mconfig_queue_read(&mconfig_data, 40000 / portTICK_RATE_MS) == MDF_ERR_TIMEOUT)
+    {
+        MDF_FREE(mconfig_data);
+        MDF_ERROR_ASSERT(mconfig_blufi_deinit());
+    	return MDF_FAIL;
+    }
 
     /**
      * @brief Deinitialize Bluetooth network configuration and Network configuration chain.
