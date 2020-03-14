@@ -12,19 +12,19 @@
 #include "../headers/Mqtt_intr_cb.h"
 #include "mconfig_blufi.h"
 
-
 extern const char *TAG;
 extern const char *TAG2;
 extern esp_mqtt_client_handle_t clientAdafruit;
-extern SemaphoreHandle_t pir_sem,alarma_onoff_sem;
+extern SemaphoreHandle_t pir_sem,alarma_onoff_sem, config_sem;
 extern DRAM_ATTR char CUARTO[20];
+
 
 esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 {
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
     char *aux_topic,*aux_data;
-    mdf_err_t ret = MDF_OK;
+    //mdf_err_t ret = MDF_OK;
     mwifi_data_type_t data_type = {0x0};
     //char *data    = NULL;
     uint8_t dest_addr[MWIFI_ADDR_LEN] = MWIFI_ADDR_BROADCAST;
@@ -124,12 +124,20 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    uint32_t gpio_num = (uint32_t) arg;
 
-    xSemaphoreGiveFromISR(pir_sem, &xHigherPriorityTaskWoken);
-    if(xHigherPriorityTaskWoken != pdFALSE)
+    if(gpio_num == PIR_PIN)
     {
-        portYIELD_FROM_ISR();   //obligo a que se vuelva a ejecutar el scheduler si la tarea liberada es de mayor prioridad
+		xSemaphoreGiveFromISR(pir_sem, &xHigherPriorityTaskWoken);
     }
+    else if(gpio_num == PUL_BOOT)
+    {
+		xSemaphoreGiveFromISR(config_sem, &xHigherPriorityTaskWoken);
+    }
+	if(xHigherPriorityTaskWoken != pdFALSE)
+	{
+		portYIELD_FROM_ISR();   //obligo a que se vuelva a ejecutar el scheduler si la tarea liberada es de mayor prioridad
+	}
 }
 
 /**
@@ -143,7 +151,7 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
 mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 {
     MDF_LOGI("event_loop_cb, event: %d", event);
-    static node_list_t node_list = {0x0};
+    //static node_list_t node_list = {0x0};
 
     switch (event) {
         case MDF_EVENT_MWIFI_STARTED:

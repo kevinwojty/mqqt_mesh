@@ -31,11 +31,12 @@ void LectPir (void *pvParameter);
 const char *CONFIG_BROKER_URL ="mqtt://chuka:75fee8844a354e30a3d8b1ac2c5d375c@io.adafruit.com";
 const char *TAG = "mesh";
 const char *TAG2 = "mqtt_adafruit";
+const char *TAG3 = "NVS";
+
 
 DRAM_ATTR char CUARTO[20] = "comedor";
-SemaphoreHandle_t pir_sem, alarma_onoff_sem;
+SemaphoreHandle_t pir_sem, alarma_onoff_sem, config_sem;
 esp_mqtt_client_handle_t clientAdafruit;
-
 
 static mdf_err_t wifi_init()
 {
@@ -111,7 +112,7 @@ void LectPir (void *pvParameter)
     vTaskDelete(NULL);
 }
 
-mdf_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
+esp_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
 {
 	nvs_handle my_handle;
 	esp_err_t err;
@@ -125,17 +126,11 @@ mdf_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
 	err = nvs_get_str(my_handle,"router_ssid",cfg->router_ssid,&required_size);
 	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
 
-	ESP_LOGI(TAG2,"Guardo router");
-
 	err = nvs_get_str(my_handle,"router_pass",cfg->router_password,&required_size);
 	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
 
-	ESP_LOGI(TAG2,"Guardo router");
-
 	err = nvs_get_str(my_handle,"mesh_pass",cfg->mesh_password,&required_size);
 	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-
-	ESP_LOGI(TAG2,"Guardo router");
 
 	char *aux;
 
@@ -147,20 +142,15 @@ mdf_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
 	strcpy(cuarto,aux);
 	free(aux);
 
-	ESP_LOGI(TAG2,"Guardo router");
-
 	size_t size = sizeof(cfg->mesh_id);
 	nvs_get_blob(my_handle, "mesh_id", cfg->mesh_id, &size);
-
-	ESP_LOGI(TAG2,"Guardo router");
-
 
 	// Close
 	nvs_close(my_handle);
 	return ESP_OK;
 }
 
-mdf_err_t set_mwifi_nvs (mwifi_config_t * cfg,char * cuarto)
+esp_err_t set_mwifi_nvs (mwifi_config_t * cfg,char * cuarto)
 {
 	nvs_handle my_handle;
 	esp_err_t err;
@@ -179,10 +169,6 @@ mdf_err_t set_mwifi_nvs (mwifi_config_t * cfg,char * cuarto)
 
 	err = nvs_set_str(my_handle,"mesh_pass",cfg->mesh_password);
 	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-
-	//char aux[30];
-
-	//strcpy(aux,cuarto);
 
 	err = nvs_set_str(my_handle,"room",cuarto);
 	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
@@ -203,28 +189,78 @@ mdf_err_t set_mwifi_nvs (mwifi_config_t * cfg,char * cuarto)
 	return ESP_OK;
 }
 
+esp_err_t config_mesh (mwifi_config_t * cfg)
+{
+    char custom_data[32] = {0x0};
+    char name[28]        = {0x0};
+    //mwifi_config_t mwifi_config = {0x0};
+    mdf_err_t err = MDF_OK;
+    esp_err_t err2 = ESP_OK;
+
+    ESP_LOGD(TAG, "Configuracion iniciada");
+
+    sprintf(name, "ESP-WIFI-MESH_%s",CUARTO);
+
+    do
+    {
+		err = get_network_config(name, cfg, custom_data);
+		if(err == MDF_OK)
+		{
+			int k;
+			strcpy(CUARTO,custom_data);
+			for(k=0;k< strlen(CUARTO);k++)
+				CUARTO[k] = tolower((int)CUARTO[k]);
+			CUARTO[k] = 0;
+
+			err2 = set_mwifi_nvs(cfg,CUARTO);
+
+			if (err2 == ESP_OK)	// Se configuro correctamente
+			{
+				ESP_LOGI(TAG3, "Actualizada configuracion mesh");
+			    MDF_ERROR_ASSERT(esp_bt_mem_release(ESP_BT_MODE_BLE));
+				return ESP_OK;
+				//esp_restart();
+			}
+			ESP_LOGE(TAG3, "No se pudo guardar datos en NVS");
+			nvs_flash_erase_partition("MWIFI_CONF");
+		}
+	}while(err2 != ESP_OK);
+
+    /**
+     * @brief Note that once BT controller memory is released, the process cannot be reversed.
+     *        It means you can not use the bluetooth mode which you have released by this function.
+     *        it can release the .bss, .data and other section to heap
+     */
+    MDF_ERROR_ASSERT(esp_bt_mem_release(ESP_BT_MODE_BLE));
+    return ESP_ERR_TIMEOUT;
+}
+
+void task_reset_config(void *pvParameter)
+{
+    xSemaphoreTake(config_sem,portMAX_DELAY);
+    while(1)
+    {
+		ESP_LOGI(TAG, "Reseteando para configurar dispositivo");
+		esp_restart();
+    }
+	vTaskDelete(NULL);
+}
+
 
 void app_main()
 {
     gpio_config_t io_conf;
 
     mwifi_init_config_t cfg   = MWIFI_INIT_CONFIG_DEFAULT();
-    char name[28]        = {0x0};
-    char custom_data[32] = {0x0};
     mwifi_config_t mwifi_config = {0x0};
-    /*mwifi_config_t config     = {
-        .router_ssid     = CONFIG_ROUTER_SSID,
-        .router_password = CONFIG_ROUTER_PASSWORD,
-        .mesh_id         = CONFIG_MESH_ID,
-        .mesh_password   = CONFIG_MESH_PASSWORD,
-    };*/
-
     /**
      * @brief Set the log level for serial port printing.
      */
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set(TAG, ESP_LOG_DEBUG);
     esp_log_level_set("mconfig_blufi", ESP_LOG_DEBUG);
+    esp_log_level_set(TAG2, ESP_LOG_DEBUG);
+    esp_log_level_set(TAG3, ESP_LOG_DEBUG);
 
 
     /**
@@ -233,54 +269,30 @@ void app_main()
     MDF_ERROR_ASSERT(mdf_event_loop_init(event_loop_cb));
     MDF_ERROR_ASSERT(wifi_init());
 
-    uint8_t sta_mac[6] = {0};
-    MDF_ERROR_ASSERT(esp_wifi_get_mac(ESP_IF_WIFI_STA, sta_mac));
-    sprintf(name, "ESP-WIFI-MESH_%02x%02x", sta_mac[4], sta_mac[5]);
+    esp_reset_reason_t rst_reason;
+    esp_err_t ret3 = ESP_FAIL;
 
-    //MDF_ERROR_ASSERT(get_network_config(name, &mwifi_config, custom_data));
-    get_network_config(name, &mwifi_config, custom_data);
+    rst_reason = esp_reset_reason();
+
+    if(rst_reason == ESP_RST_SW)
+    {
+    	ret3 = config_mesh(&mwifi_config);
+    	//ESP_LOGE(TAG, "FUNCIONA");
+    }
+
+    if(ret3 != ESP_OK)
+	{
+    	if(get_mwifi_nvs(&mwifi_config,CUARTO) != ESP_OK)
+    	{
+			ESP_LOGE(TAG, "No se pudo leer datos en NVS");
+			nvs_flash_erase_partition("MWIFI_CONF");
+			esp_restart();
+    	}
+	}
 
     MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
              mwifi_config.router_ssid, mwifi_config.router_password,
              MAC2STR(mwifi_config.mesh_id), CUARTO);
-
-    if(strlen(custom_data)> 4)
-    {
-    	int k;
-    	strcpy(CUARTO,custom_data);
-    	for(k=0;k< strlen(CUARTO);k++)
-    		CUARTO[k] = tolower((int)CUARTO[k]);
-    	CUARTO[k] = 0;
-
-    	if (set_mwifi_nvs(&mwifi_config,CUARTO) != ESP_OK)
-    	{
-            ESP_LOGE(TAG, "No se pudo guardar datos en NVS");
-            nvs_flash_erase_partition("MWIFI_CONF");
-            esp_restart();
-    	}
-
-    }
-    else
-    {
-    	char cuarto_aux[30]={0};
-    	if (get_mwifi_nvs(&mwifi_config,cuarto_aux) != ESP_OK)
-    	{
-            ESP_LOGE(TAG, "No se pudo leer datos en NVS");
-            nvs_flash_erase_partition("MWIFI_CONF");
-            esp_restart();
-    	}
-    	strcpy(CUARTO,cuarto_aux);
-    }
-    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
-             mwifi_config.router_ssid, mwifi_config.router_password,
-             MAC2STR(mwifi_config.mesh_id), CUARTO);
-
-    /**
-     * @brief Note that once BT controller memory is released, the process cannot be reversed.
-     *        It means you can not use the bluetooth mode which you have released by this function.
-     *        it can release the .bss, .data and other section to heap
-     */
-    //MDF_ERROR_ASSERT(esp_bt_mem_release(ESP_BT_MODE_BLE));
 
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
 	io_conf.mode = GPIO_MODE_INPUT;
@@ -309,9 +321,12 @@ void app_main()
     //Creo los semaforos y los inicializo tomados
     pir_sem = xSemaphoreCreateBinary();
     alarma_onoff_sem = xSemaphoreCreateBinary();
+    config_sem = xSemaphoreCreateBinary();
     xSemaphoreTake(pir_sem,10 / portTICK_RATE_MS);     //por seguridad,segun documentacion empieza tomado
     xSemaphoreTake(alarma_onoff_sem,10 / portTICK_RATE_MS);
-    if(pir_sem == NULL || alarma_onoff_sem == NULL)
+    xSemaphoreTake(config_sem,10 / portTICK_RATE_MS);
+
+    if(pir_sem == NULL || alarma_onoff_sem == NULL || config_sem == NULL)
     {
         ESP_LOGE(TAG, "No se pudo inicializar el semaforo");
         esp_restart();
@@ -320,10 +335,11 @@ void app_main()
     xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
     xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,2,NULL );
     xTaskCreate(&Postled, "Postled", 2048,NULL,1,NULL );
+    xTaskCreate(&task_reset_config, "task_reset", 3072,NULL,5,NULL );
+	gpio_isr_handler_add(PUL_BOOT, gpio_isr_handler, (void*) PUL_BOOT);
+
 
     MDF_ERROR_ASSERT(mwifi_init(&cfg));
     MDF_ERROR_ASSERT(mwifi_set_config(&mwifi_config));
     MDF_ERROR_ASSERT(mwifi_start());
-
-
 }

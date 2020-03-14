@@ -19,8 +19,8 @@ mdf_err_t get_network_config(const char *name, mwifi_config_t *mwifi_config, cha
 
     mconfig_data_t *mconfig_data        = NULL;
     mconfig_blufi_config_t blufi_config = {
-        .tid = 1, /**< Type of device. Used to distinguish different products,
-                       APP can display different icons according to this tid. */
+        .tid = 22, /**< Type of device. Used to distinguish different products,
+                       APP can display different icons according to this tid. 0-10 Light, 11-20 Button, 21-30 Sensor */
         .company_id = MCOMMON_ESPRESSIF_ID, /**< Company Identifiers (https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers) */
     };
 
@@ -38,7 +38,7 @@ mdf_err_t get_network_config(const char *name, mwifi_config_t *mwifi_config, cha
      *      When blufi or network configuration chain complete, will send configuration information to config_queue.
      */
     //MDF_ERROR_ASSERT(mconfig_queue_read(&mconfig_data, 60000 / portTICK_RATE_MS));
-    if(mconfig_queue_read(&mconfig_data, 40000 / portTICK_RATE_MS) == MDF_ERR_TIMEOUT)
+    if(mconfig_queue_read(&mconfig_data, 60000 / portTICK_RATE_MS) == MDF_ERR_TIMEOUT)
     {
         MDF_FREE(mconfig_data);
         MDF_ERROR_ASSERT(mconfig_blufi_deinit());
