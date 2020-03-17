@@ -216,7 +216,7 @@ void app_main()
     	}
 	}
 
-    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
+    MDF_LOGD("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
              mwifi_config.router_ssid, mwifi_config.router_password,
              MAC2STR(mwifi_config.mesh_id), CUARTO);
 

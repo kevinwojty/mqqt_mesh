@@ -37,8 +37,8 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             msg_id = esp_mqtt_client_subscribe(client, TOPIC1, 1);
             ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
 
-            msg_id = esp_mqtt_client_subscribe(client, TOPIC2, 1);
-            ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
+            //msg_id = esp_mqtt_client_subscribe(client, TOPIC2, 1);
+            //ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
 
             break;
 
@@ -67,14 +67,15 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             /**
              * @brief Send mqtt server information to nodes throught root node.
              */
-            if(strcmp(aux_topic,TOPIC1)==0)	//si es que se activo alguna alarma se la envio a todos
+            if(strcmp(aux_topic,TOPIC1)==0)	//si es que se encendio alguna alarma
             {
-            	char *temp_on = NULL,*temp_off = NULL;
+            	char *temp_on = NULL,*temp_off = NULL, *send_str = NULL;
 
             	MDF_LOGD("Node send, size: %d, data: %s", event->data_len,aux_data);
 
             	temp_on = MDF_MALLOC(sizeof(char)*25);
             	temp_off = MDF_MALLOC(sizeof(char)*25);
+            	//send_str = MDF_MALLOC(sizeof(char)*45);
 
             	strcpy(temp_on,CUARTO);
             	strcat(temp_on," ON");
@@ -97,12 +98,13 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 				}
             	else	//caso que no sea se lo re envio a los nodos
             	{
-            		mwifi_root_write(dest_addr, 1, &data_type, event->data, event->data_len, true);
+            		asprintf(send_str,"%s,%s,%s",aux_data,aux_topic," ");
+            		mwifi_root_write(dest_addr, 1, &data_type, send_str, strlen(send_str), true);
             		//MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
             	}
         		free(temp_on);
         		free(temp_off);
-
+        		free(send_str);
 //MEM_FREE:
 		//MDF_FREE(data);
             }   //Si es movimiento no hago nada ya que yo envie la notificacion
