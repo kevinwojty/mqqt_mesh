@@ -280,7 +280,7 @@ void app_main()
      *        It means you can not use the bluetooth mode which you have released by this function.
      *        it can release the .bss, .data and other section to heap
      */
-    //MDF_ERROR_ASSERT(esp_bt_mem_release(ESP_BT_MODE_BLE));
+    MDF_ERROR_ASSERT(esp_bt_mem_release(ESP_BT_MODE_BLE));
 
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
 	io_conf.mode = GPIO_MODE_INPUT;

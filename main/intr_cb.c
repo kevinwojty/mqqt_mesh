@@ -175,8 +175,6 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
             MDF_LOGI("Root obtains the IP address. It is posted by LwIP stack automatically");
 
-            gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
-
             if (esp_mesh_is_root())
             {
             	mqtt_app_start();
@@ -191,6 +189,11 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
         case MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED:
             MDF_LOGI("MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED");
+            break;
+
+        case MDF_EVENT_MWIFI_TODS_STATE:
+            MDF_LOGI("MDF_EVENT_MWIFI_TODS_STATE");
+            gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
             break;
 
 		/**< Add a custom communication process */

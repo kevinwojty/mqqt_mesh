@@ -14,7 +14,7 @@
 extern const char *TAG;
 extern SemaphoreHandle_t alarma_onoff_sem;
 extern esp_mqtt_client_handle_t clientAdafruit;
-extern char *CUARTO;
+extern DRAM_ATTR char CUARTO[20];
 
 void root_write_task(void *arg)
 {
@@ -91,6 +91,8 @@ void node_read_task(void *arg)
         	strcat(temp_on," ON");
         	strcpy(temp_off,CUARTO);
         	strcat(temp_off," OFF");
+
+        	ESP_LOGI(TAG,"%s=%s",data,temp_on);
 
             if(strcmp(data,temp_on) == 0)
             {
