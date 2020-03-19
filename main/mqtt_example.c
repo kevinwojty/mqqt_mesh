@@ -265,37 +265,7 @@ void app_main()
     esp_log_level_set(TAG2, ESP_LOG_DEBUG);
     esp_log_level_set(TAG3, ESP_LOG_DEBUG);
 
-    /**
-     * @brief Initialize wifi mesh.
-     */
-    MDF_ERROR_ASSERT(mdf_event_loop_init(event_loop_cb));
-    MDF_ERROR_ASSERT(wifi_init());
-
-    esp_reset_reason_t rst_reason;
-    esp_err_t ret3 = ESP_FAIL;
-
-    rst_reason = esp_reset_reason();
-
-    if(rst_reason == ESP_RST_SW)
-    {
-    	ret3 = config_mesh(&mwifi_config);
-    	//ESP_LOGE(TAG, "FUNCIONA");
-    }
-
-    if(ret3 != ESP_OK)
-	{
-    	if(get_mwifi_nvs(&mwifi_config,CUARTO) != ESP_OK)
-    	{
-			ESP_LOGE(TAG, "No se pudo leer datos en NVS");
-			nvs_flash_erase_partition("MWIFI_CONF");
-			esp_restart();
-    	}
-	}
-
-    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
-             mwifi_config.router_ssid, mwifi_config.router_password,
-             MAC2STR(mwifi_config.mesh_id), CUARTO);
-
+    // @brief Configuración de pines y habilitación de int
     io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
 	io_conf.mode = GPIO_MODE_INPUT;
 	io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
@@ -317,6 +287,7 @@ void app_main()
 	io_conf.pull_up_en = 0;
 	gpio_config(&io_conf);      //configure GPIO with the given settings
 
+	gpio_set_level(LED_BUILT_IN,0);
 
     //Instalo las interrupciones para GPIO
     gpio_install_isr_service(ESP_INTR_FLAG_LOWMED);
@@ -332,6 +303,36 @@ void app_main()
         ESP_LOGE(TAG, "No se pudo inicializar el semaforo");
         esp_restart();
     }
+
+    /**
+     * @brief Initialize wifi mesh.
+     */
+    MDF_ERROR_ASSERT(mdf_event_loop_init(event_loop_cb));
+    MDF_ERROR_ASSERT(wifi_init());
+
+    esp_reset_reason_t rst_reason;
+    esp_err_t ret3 = ESP_FAIL;
+
+	if(get_mwifi_nvs(&mwifi_config,CUARTO) != ESP_OK)
+	{
+		ESP_LOGE(TAG, "No se pudo leer datos en NVS");
+		nvs_flash_erase_partition("MWIFI_CONF");
+		esp_restart();
+	}
+
+    rst_reason = esp_reset_reason();
+
+    if(rst_reason == ESP_RST_SW)
+    {
+    	ret3 = config_mesh(&mwifi_config);
+    	//ESP_LOGE(TAG, "FUNCIONA");
+    }
+
+    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
+             mwifi_config.router_ssid, mwifi_config.router_password,
+             MAC2STR(mwifi_config.mesh_id), CUARTO);
+
+
     //Inicializacion de las tareas
     xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
     xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,2,NULL );
