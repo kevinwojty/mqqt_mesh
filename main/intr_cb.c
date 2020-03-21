@@ -85,10 +85,10 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
-						xSemaphoreGive(alarma_onoff_sem);
-						//Agrego la interrupción para un pin en particular del GPIO
-						gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
-						//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
+					xSemaphoreGive(alarma_onoff_sem);
+					//Agrego la interrupción para un pin en particular del GPIO
+					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
                 }
                 else if(strcmp(aux_data,temp_off) == 0)
 				{
@@ -97,7 +97,12 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 				}
             	else	//caso que no sea se lo re envio a los nodos
             	{
-            		mwifi_root_write(dest_addr, 1, &data_type, event->data, event->data_len, true);
+            	    size_t size   = 0;
+            	    char *data    = NULL;
+
+                    size = asprintf(&data,"%s,%s,%s",aux_data,TOPIC2,"no hay msj");
+            		mwifi_root_write(dest_addr, 1, &data_type, data, size, true);
+                    MDF_LOGI("Enviado: %s",data);
             		//MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
             	}
         		free(temp_on);
