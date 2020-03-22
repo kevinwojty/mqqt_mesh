@@ -26,7 +26,6 @@
 #include "../headers/fnvs.h"
 #include "../headers/wifi_mesh.h"
 
-
 void LectPir (void *pvParameter);
 
 // #define MEMORY_DEBUG
@@ -106,7 +105,6 @@ void app_main()
 
     mwifi_init_config_t cfg   = MWIFI_INIT_CONFIG_DEFAULT();
     mwifi_config_t mwifi_config = {0x0};
-
     /**
      * @brief Set the log level for serial port printing.
      */
@@ -116,15 +114,15 @@ void app_main()
     esp_log_level_set(TAG2, ESP_LOG_DEBUG);
     esp_log_level_set(TAG3, ESP_LOG_DEBUG);
 
-    // @brief Configuración de pines y habilitación de int
-    io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
+    // @brief Configuraciï¿½n de pines y habilitaciï¿½n de int
+  io_conf.intr_type = GPIO_PIN_INTR_POSEDGE;
 	io_conf.mode = GPIO_MODE_INPUT;
 	io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
 	io_conf.pull_down_en = 1;
 	io_conf.pull_up_en = 0;
 	gpio_config(&io_conf);      //configure GPIO with the given settings
 
-    io_conf.intr_type = GPIO_PIN_INTR_NEGEDGE;
+  io_conf.intr_type = GPIO_PIN_INTR_NEGEDGE;
 	io_conf.mode = GPIO_MODE_INPUT;
 	io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL2;
 	io_conf.pull_down_en = 0;
@@ -149,6 +147,7 @@ void app_main()
     xSemaphoreTake(pir_sem,10 / portTICK_RATE_MS);     //por seguridad,segun documentacion empieza tomado
     xSemaphoreTake(alarma_onoff_sem,10 / portTICK_RATE_MS);
     xSemaphoreTake(config_sem,10 / portTICK_RATE_MS);
+
     if(pir_sem == NULL || alarma_onoff_sem == NULL || config_sem == NULL)
     {
         ESP_LOGE(TAG, "No se pudo inicializar el semaforo");
@@ -191,9 +190,8 @@ void app_main()
     xTaskCreate(&task_reset_config, "task_reset", 3072,NULL,5,NULL );
 	gpio_isr_handler_add(PUL_BOOT, gpio_isr_handler, (void*) PUL_BOOT);
 
+
     MDF_ERROR_ASSERT(mwifi_init(&cfg));
     MDF_ERROR_ASSERT(mwifi_set_config(&mwifi_config));
     MDF_ERROR_ASSERT(mwifi_start());
-
-
 }

@@ -12,12 +12,12 @@
 #include "../headers/Mqtt_intr_cb.h"
 #include "mconfig_blufi.h"
 
-
 extern const char *TAG;
 extern const char *TAG2;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern SemaphoreHandle_t pir_sem,alarma_onoff_sem, config_sem;
 extern DRAM_ATTR char CUARTO[20];
+
 
 esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 {
@@ -37,8 +37,8 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             msg_id = esp_mqtt_client_subscribe(client, TOPIC1, 1);
             ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
 
-            msg_id = esp_mqtt_client_subscribe(client, TOPIC2, 1);
-            ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
+            //msg_id = esp_mqtt_client_subscribe(client, TOPIC2, 1);
+            //ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
 
             break;
 
@@ -60,21 +60,22 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 
             ESP_LOGI(TAG2, "MQTT_EVENT_DATA");
 
-            //Analizo la información que llego
+            //Analizo la informaciÃ³n que llego
             asprintf(&aux_topic,"%.*s",event->topic_len, event->topic);
             asprintf(&aux_data,"%.*s",event->data_len, event->data);
 
             /**
              * @brief Send mqtt server information to nodes throught root node.
              */
-            if(strcmp(aux_topic,TOPIC1)==0)	//si es que se activo alguna alarma se la envio a todos
+            if(strcmp(aux_topic,TOPIC1)==0)	//si es que se encendio alguna alarma
             {
-            	char *temp_on = NULL,*temp_off = NULL;
+            	char *temp_on = NULL,*temp_off = NULL, *send_str = NULL;
 
             	MDF_LOGD("Node send, size: %d, data: %s", event->data_len,aux_data);
 
             	temp_on = MDF_MALLOC(sizeof(char)*25);
             	temp_off = MDF_MALLOC(sizeof(char)*25);
+            	//send_str = MDF_MALLOC(sizeof(char)*45);
 
             	strcpy(temp_on,CUARTO);
             	strcat(temp_on," ON");
@@ -86,7 +87,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
 					xSemaphoreGive(alarma_onoff_sem);
-					//Agrego la interrupción para un pin en particular del GPIO
+					//Agrego la interrupciÃ³n para un pin en particular del GPIO
 					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
 					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
                 }
@@ -107,7 +108,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             	}
         		free(temp_on);
         		free(temp_off);
-
+        		free(send_str);
 //MEM_FREE:
 		//MDF_FREE(data);
             }   //Si es movimiento no hago nada ya que yo envie la notificacion

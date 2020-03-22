@@ -18,7 +18,7 @@ extern DRAM_ATTR char CUARTO[20];
 
 void root_write_task(void *arg)
 {
-    mdf_err_t ret = MDF_OK;
+    //mdf_err_t ret = MDF_OK;
     char *rcv    = MDF_MALLOC(MWIFI_PAYLOAD_LEN);
     size_t size   = MWIFI_PAYLOAD_LEN;
     uint8_t src_addr[MWIFI_ADDR_LEN] = {0x0};
@@ -34,7 +34,7 @@ void root_write_task(void *arg)
          * @brief Recv data from node, and forward to mqtt server.
          */
         memset(rcv, 0, MWIFI_PAYLOAD_LEN);
-        ret = mwifi_root_read(src_addr, &data_type, rcv, &size, portMAX_DELAY);
+        mwifi_root_read(src_addr, &data_type, rcv, &size, portMAX_DELAY);
 
         //Separo los campos que me enviaron separados por comas
         data.cuarto = strtok(rcv, s);
@@ -75,10 +75,6 @@ void node_read_task(void *arg)
         }
 
         size = MWIFI_PAYLOAD_LEN;
-        memset(rcv, 0, MWIFI_PAYLOAD_LEN);
-        ret = mwifi_read(src_addr, &data_type, rcv, &size, portMAX_DELAY);
-        MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
-        MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %s", MAC2STR(src_addr), size, rcv);
 
         //Separo los campos que me enviaron separados por comas
         data.cuarto = strtok(rcv, s);
@@ -104,7 +100,7 @@ void node_read_task(void *arg)
             if(strcmp(data.cuarto,temp_on) == 0)
             {
 				xSemaphoreGive(alarma_onoff_sem);
-				//Agrego la interrupción para un pin en particular del GPIO
+				//Agrego la interrupciÃ³n para un pin en particular del GPIO
 				gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
 				//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
             }
