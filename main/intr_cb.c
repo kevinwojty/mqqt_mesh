@@ -60,7 +60,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 
             ESP_LOGI(TAG2, "MQTT_EVENT_DATA");
 
-            //Analizo la información que llego
+            //Analizo la informaciÃ³n que llego
             asprintf(&aux_topic,"%.*s",event->topic_len, event->topic);
             asprintf(&aux_data,"%.*s",event->data_len, event->data);
 
@@ -86,10 +86,10 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
-						xSemaphoreGive(alarma_onoff_sem);
-						//Agrego la interrupción para un pin en particular del GPIO
-						gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
-						//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
+					xSemaphoreGive(alarma_onoff_sem);
+					//Agrego la interrupciÃ³n para un pin en particular del GPIO
+					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
                 }
                 else if(strcmp(aux_data,temp_off) == 0)
 				{
@@ -98,8 +98,12 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 				}
             	else	//caso que no sea se lo re envio a los nodos
             	{
-            		asprintf(send_str,"%s,%s,%s",aux_data,aux_topic," ");
-            		mwifi_root_write(dest_addr, 1, &data_type, send_str, strlen(send_str), true);
+            	    size_t size   = 0;
+            	    char *data    = NULL;
+
+                    size = asprintf(&data,"%s,%s,%s",aux_data,TOPIC2,"no hay msj");
+            		mwifi_root_write(dest_addr, 1, &data_type, data, size, true);
+                    MDF_LOGI("Enviado: %s",data);
             		//MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
             	}
         		free(temp_on);
@@ -141,7 +145,6 @@ void IRAM_ATTR gpio_isr_handler(void* arg)
 		portYIELD_FROM_ISR();   //obligo a que se vuelva a ejecutar el scheduler si la tarea liberada es de mayor prioridad
 	}
 }
-
 /**
  * @brief All module events will be sent to this task in esp-mdf
  *
@@ -185,8 +188,6 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
             MDF_LOGI("Root obtains the IP address. It is posted by LwIP stack automatically");
 
-            gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
-
             if (esp_mesh_is_root())
             {
             	mqtt_app_start();
@@ -201,6 +202,11 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
         case MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED:
             MDF_LOGI("MDF_EVENT_MCONFIG_BLUFI_STA_CONNECTED");
+            break;
+
+        case MDF_EVENT_MWIFI_TODS_STATE:
+            MDF_LOGI("MDF_EVENT_MWIFI_TODS_STATE");
+            gpio_set_level(LED_BUILT_IN,1); //prendo el led como indicador de que el sistema arranco
             break;
 
 		/**< Add a custom communication process */
