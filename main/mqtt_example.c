@@ -138,21 +138,6 @@ void app_main()
 
 	gpio_set_level(LED_BUILT_IN,0);
 
-    //Instalo las interrupciones para GPIO
-    gpio_install_isr_service(ESP_INTR_FLAG_LOWMED);
-    //Creo los semaforos y los inicializo tomados
-    pir_sem = xSemaphoreCreateBinary();
-    alarma_onoff_sem = xSemaphoreCreateBinary();
-    config_sem = xSemaphoreCreateBinary();
-    xSemaphoreTake(pir_sem,10 / portTICK_RATE_MS);     //por seguridad,segun documentacion empieza tomado
-    xSemaphoreTake(alarma_onoff_sem,10 / portTICK_RATE_MS);
-    xSemaphoreTake(config_sem,10 / portTICK_RATE_MS);
-
-    if(pir_sem == NULL || alarma_onoff_sem == NULL || config_sem == NULL)
-    {
-        ESP_LOGE(TAG, "No se pudo inicializar el semaforo");
-        esp_restart();
-    }
 
     /**
      * @brief Initialize wifi mesh.
@@ -161,9 +146,9 @@ void app_main()
     MDF_ERROR_ASSERT(wifi_init());
 
     esp_reset_reason_t rst_reason;
-    esp_err_t ret3 = ESP_FAIL;
+    uint8_t last_state;
 
-	if(get_mwifi_nvs(&mwifi_config,CUARTO) != ESP_OK)
+	if(get_mwifi_nvs(&mwifi_config,CUARTO, &last_state) != ESP_OK)
 	{
 		ESP_LOGE(TAG, "No se pudo leer datos en NVS");
 		nvs_flash_erase_partition("MWIFI_CONF");
@@ -174,24 +159,48 @@ void app_main()
 
     if(rst_reason == ESP_RST_SW)
     {
-    	ret3 = config_mesh(&mwifi_config);
-    	//ESP_LOGE(TAG, "FUNCIONA");
+    	config_mesh(&mwifi_config);
+    	last_state = 0;		//al reiniciar el sensor empieza apagado
     }
 
-    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", custom: %s",
+    MDF_LOGI("mconfig, ssid: %s, password: %s, mesh_id: " MACSTR ", cuarto: %s, last state: %d",
              mwifi_config.router_ssid, mwifi_config.router_password,
-             MAC2STR(mwifi_config.mesh_id), CUARTO);
+             MAC2STR(mwifi_config.mesh_id), CUARTO, last_state);
 
+
+    //Instalo las interrupciones para GPIO
+    gpio_install_isr_service(ESP_INTR_FLAG_LOWMED);
+    //Creo los semaforos y los inicializo tomados
+    pir_sem = xSemaphoreCreateBinary();
+    alarma_onoff_sem = xSemaphoreCreateBinary();
+    config_sem = xSemaphoreCreateBinary();
+
+    if(pir_sem == NULL || alarma_onoff_sem == NULL || config_sem == NULL)
+    {
+        ESP_LOGE(TAG, "No se pudo inicializar el semaforo");
+        esp_restart();
+    }
+
+    xSemaphoreTake(pir_sem,10 / portTICK_RATE_MS);     //por seguridad,segun documentacion empieza tomado
+    xSemaphoreTake(config_sem,10 / portTICK_RATE_MS);
+
+    MDF_ERROR_ASSERT(mwifi_init(&cfg));
+    MDF_ERROR_ASSERT(mwifi_set_config(&mwifi_config));
+    MDF_ERROR_ASSERT(mwifi_start());
 
     //Inicializacion de las tareas
     xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
     xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,2,NULL );
     xTaskCreate(&Postled, "Postled", 2048,NULL,1,NULL );
-    xTaskCreate(&task_reset_config, "task_reset", 3072,NULL,5,NULL );
+    xTaskCreate(&task_reset_config, "task_reset", 2048,NULL,5,NULL );
 	gpio_isr_handler_add(PUL_BOOT, gpio_isr_handler, (void*) PUL_BOOT);
 
+    if(last_state == 1)	// significa que estaba prendido antes de apagarse el sistema
+    {
+    	xSemaphoreGive(alarma_onoff_sem);
+    	gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+    }
+    else
+    	xSemaphoreTake(alarma_onoff_sem,10 / portTICK_RATE_MS);
 
-    MDF_ERROR_ASSERT(mwifi_init(&cfg));
-    MDF_ERROR_ASSERT(mwifi_set_config(&mwifi_config));
-    MDF_ERROR_ASSERT(mwifi_start());
 }

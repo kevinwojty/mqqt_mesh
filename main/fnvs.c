@@ -9,7 +9,7 @@
 
 extern const char *TAG3;
 
-esp_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
+esp_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto, uint8_t *last_state)
 {
 	nvs_handle my_handle;
 	esp_err_t err;
@@ -38,6 +38,9 @@ esp_err_t get_mwifi_nvs (mwifi_config_t * cfg, char * cuarto)
 
 	strcpy(cuarto,aux);
 	free(aux);
+
+	err = nvs_get_u8(my_handle,"last_state",last_state);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
 
 	size_t size = sizeof(cfg->mesh_id);
 	nvs_get_blob(my_handle, "mesh_id", cfg->mesh_id, &size);
@@ -84,6 +87,28 @@ esp_err_t set_mwifi_nvs (mwifi_config_t * cfg,char * cuarto)
     if (err != ESP_OK) return err;
 
 	ESP_LOGI(TAG3,"Configuracion guardada");
+
+	// Close
+	nvs_close(my_handle);
+	return ESP_OK;
+}
+
+esp_err_t set_lastState_nvs (uint8_t last_state)
+{
+	nvs_handle my_handle;
+	esp_err_t err;
+
+	// Open
+	err = nvs_open("MWIFI_CONF", NVS_READWRITE, &my_handle);
+	if (err != ESP_OK) return err;
+
+	err = nvs_set_u8(my_handle,"last_state",last_state);
+	if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+    err = nvs_commit(my_handle);
+    if (err != ESP_OK) return err;
+
+	ESP_LOGI(TAG3,"Ultimo estado guardado");
 
 	// Close
 	nvs_close(my_handle);

@@ -10,6 +10,8 @@
 //#include "mesh_mqtt_handle.h"
 #include "../headers/node.h"
 #include "../headers/Mqtt_intr_cb.h"
+#include "../headers/fnvs.h"
+
 
 extern const char *TAG;
 extern SemaphoreHandle_t alarma_onoff_sem;
@@ -74,7 +76,10 @@ void node_read_task(void *arg)
             continue;
         }
 
-        size = MWIFI_PAYLOAD_LEN;
+        memset(rcv, 0, MWIFI_PAYLOAD_LEN);
+        ret = mwifi_read(src_addr, &data_type, rcv, &size, portMAX_DELAY);
+        MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
+        MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %s", MAC2STR(src_addr), size, rcv);
 
         //Separo los campos que me enviaron separados por comas
         data.cuarto = strtok(rcv, s);
@@ -102,12 +107,14 @@ void node_read_task(void *arg)
 				xSemaphoreGive(alarma_onoff_sem);
 				//Agrego la interrupción para un pin en particular del GPIO
 				gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+				set_lastState_nvs(1);
 				//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
             }
             else if(strcmp(data.cuarto,temp_off) == 0)
 			{
 				gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
 				xSemaphoreTake(alarma_onoff_sem,(TickType_t)1); //si ya esta apagado que no sea bloqueante
+				set_lastState_nvs(0);
 			}
 
     		free(temp_on);

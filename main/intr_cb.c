@@ -10,6 +10,7 @@
 #include "mqtt_client.h"
 //#include "mesh_mqtt_handle.h"
 #include "../headers/Mqtt_intr_cb.h"
+#include "../headers/fnvs.h"
 #include "mconfig_blufi.h"
 
 extern const char *TAG;
@@ -87,6 +88,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
 					xSemaphoreGive(alarma_onoff_sem);
+					set_lastState_nvs(1);
 					//Agrego la interrupción para un pin en particular del GPIO
 					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
 					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
@@ -94,6 +96,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
                 else if(strcmp(aux_data,temp_off) == 0)
 				{
 					gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
+					set_lastState_nvs(0);
 					xSemaphoreTake(alarma_onoff_sem,(TickType_t)1); //si ya esta apagado que no sea bloqueante
 				}
             	else	//caso que no sea se lo re envio a los nodos

@@ -46,7 +46,6 @@ esp_err_t config_mesh (mwifi_config_t * cfg)
 				ESP_LOGI(TAG3, "Actualizada configuracion mesh");
 			    MDF_ERROR_ASSERT(esp_bt_mem_release(ESP_BT_MODE_BLE));
 				return ESP_OK;
-				//esp_restart();
 			}
 			ESP_LOGE(TAG3, "No se pudo guardar datos en NVS");
 			nvs_flash_erase_partition("MWIFI_CONF");
