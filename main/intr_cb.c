@@ -9,6 +9,7 @@
 #include "mwifi.h"
 #include "mqtt_client.h"
 //#include "mesh_mqtt_handle.h"
+#include "../headers/mqtt.h"
 #include "../headers/Mqtt_intr_cb.h"
 #include "../headers/fnvs.h"
 #include "mconfig_blufi.h"
@@ -18,7 +19,7 @@ extern const char *TAG2;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern SemaphoreHandle_t pir_sem,alarma_onoff_sem, config_sem;
 extern DRAM_ATTR char CUARTO[20];
-
+extern QueueHandle_t estado_nodos;
 
 esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 {
@@ -35,11 +36,13 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG2, "MQTT_EVENT_CONNECTED");
 
-            msg_id = esp_mqtt_client_subscribe(client, TOPIC1, 1);
+            msg_id = esp_mqtt_client_subscribe(client, TOPIC_ESTADO, 1);
             ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
 
-            //msg_id = esp_mqtt_client_subscribe(client, TOPIC2, 1);
-            //ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
+            msg_id = esp_mqtt_client_subscribe(client, TOPIC_ENCENDIDO, 1);
+            ESP_LOGI(TAG2, "sent subscribe successful, msg_id=%d", msg_id);
+
+    		state_nodes();	//Solicito que se me envie el ultimo estado de todos los nodos
 
             break;
 
@@ -49,7 +52,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             break;
 
         case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG2, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+        	ESP_LOGI(TAG2, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(TAG2, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
@@ -68,7 +71,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             /**
              * @brief Send mqtt server information to nodes throught root node.
              */
-            if(strcmp(aux_topic,TOPIC1)==0)	//si es que se encendio alguna alarma
+            if(strcmp(aux_topic,TOPIC_ENCENDIDO)==0)	//si es que se encendio alguna alarma
             {
             	char *temp_on = NULL,*temp_off = NULL, *send_str = NULL;
 
@@ -104,7 +107,7 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             	    size_t size   = 0;
             	    char *data    = NULL;
 
-                    size = asprintf(&data,"%s,%s,%s",aux_data,TOPIC2,"no hay msj");
+                    size = asprintf(&data,"%s,%s,%s",aux_data,TOPIC_ENCENDIDO,"no hay msj");
             		mwifi_root_write(dest_addr, 1, &data_type, data, size, true);
                     MDF_LOGI("Enviado: %s",data);
             		//MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
@@ -115,7 +118,11 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 //MEM_FREE:
 		//MDF_FREE(data);
             }   //Si es movimiento no hago nada ya que yo envie la notificacion
-
+            else if (strcmp(aux_topic,TOPIC_ESTADO) == 0)
+            {
+            	xQueueOverwrite(estado_nodos,aux_data);
+            	ESP_LOGI(TAG2, "Se escribio en la cola: %s",aux_data);
+            }
             MDF_FREE(aux_topic);
             MDF_FREE(aux_data);
 

@@ -11,6 +11,7 @@
 
 extern const char *CONFIG_BROKER_URL;
 extern esp_mqtt_client_handle_t clientAdafruit;
+extern const char* TAG2;
 
 void get_last_value(esp_mqtt_client_handle_t client,char* topic)
 {
@@ -19,7 +20,15 @@ void get_last_value(esp_mqtt_client_handle_t client,char* topic)
 	asprintf(&aux, "%s/get",topic);
 
 	esp_mqtt_client_publish(client, aux , "\0", 0, 1, 0);
+	ESP_LOGI(TAG2, "Solicito valor en: %s",aux);
+
 	free(aux);
+}
+
+void state_nodes(void)
+{
+	get_last_value(clientAdafruit,TOPIC_ESTADO);
+	return;
 }
 
 void mqtt_app_start(void)

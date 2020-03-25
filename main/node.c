@@ -43,7 +43,7 @@ void root_write_task(void *arg)
         data.topic = strtok(NULL, s);
         data.msj = strtok(NULL, s);
 
-        if(strcmp(data.topic,TOPIC2) == 0)
+        if(strcmp(data.topic,TOPIC_DISPARO) == 0)
         {
         	char alarma[30] = "Alarma en: ";
 
@@ -88,7 +88,7 @@ void node_read_task(void *arg)
 
         ESP_LOGI(TAG,"Info recibida %s=%s=%s",data.cuarto,data.topic,data.msj);
 
-        if(strcmp(data.topic,TOPIC2)==0)	//si es que se activo alguna alarma se la envio a todos
+        if(strcmp(data.topic,TOPIC_ENCENDIDO)==0)	//si es que se prendio o apago alguna alarma se la envio a todos
         {
         	char *temp_on = NULL,*temp_off = NULL;
 

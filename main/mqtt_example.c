@@ -37,6 +37,7 @@ const char *TAG3 = "NVS";
 
 DRAM_ATTR char CUARTO[20] = "default";
 SemaphoreHandle_t pir_sem, alarma_onoff_sem, config_sem;
+QueueHandle_t estado_nodos;
 esp_mqtt_client_handle_t clientAdafruit;
 
 /*Tarea para indicar si esta activada o no la alarma*/
@@ -71,12 +72,12 @@ void LectPir (void *pvParameter)
             {
             	char alarma[30] = "Alarma en: ";
     			strcat(alarma,CUARTO);
-    			esp_mqtt_client_publish(clientAdafruit, TOPIC2 , alarma, 0, 1, 0);
+    			esp_mqtt_client_publish(clientAdafruit, TOPIC_DISPARO , alarma, 0, 1, 0);
     			ESP_LOGI(TAG2, "Publicado: %s",alarma);
             }
             else
             {
-                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC2,"no hay msj");
+                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_DISPARO," ");
                 while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
                 MDF_LOGI("Enviado: %s",data);
             }
@@ -98,6 +99,7 @@ void task_reset_config(void *pvParameter)
     }
 	vTaskDelete(NULL);
 }
+
 
 void app_main()
 {
@@ -174,6 +176,7 @@ void app_main()
     pir_sem = xSemaphoreCreateBinary();
     alarma_onoff_sem = xSemaphoreCreateBinary();
     config_sem = xSemaphoreCreateBinary();
+    estado_nodos = xQueueCreate(1,sizeof(char)*200);
 
     if(pir_sem == NULL || alarma_onoff_sem == NULL || config_sem == NULL)
     {

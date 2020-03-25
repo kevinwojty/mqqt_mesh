@@ -1,8 +1,10 @@
 
 #include "mdf_common.h"
 
-#define TOPIC1 "chuka/f/Alarma"
-#define TOPIC2 "chuka/f/EstadoAlarma"
+#define TOPIC_ENCENDIDO "chuka/f/alarma"
+#define TOPIC_DISPARO "chuka/f/alarmadisparada"
+#define TOPIC_ESTADO "chuka/f/estadoalarma"
+
 
 #define PIR_PIN GPIO_NUM_13
 #define PUL_BOOT 0
