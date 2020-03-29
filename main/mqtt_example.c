@@ -77,11 +77,12 @@ void LectPir (void *pvParameter)
             }
             else
             {
-                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_DISPARO," ");
+                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_DISPARO,"A");
                 while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
                 MDF_LOGI("Enviado: %s",data);
+                MDF_FREE(data);
             }
-            MDF_FREE(data);
+
             vTaskDelay(30000 / portTICK_RATE_MS);
             gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);   //habilito nuevamente el pir
         }

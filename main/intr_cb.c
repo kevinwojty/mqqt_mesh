@@ -69,13 +69,13 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             asprintf(&aux_data,"%.*s",event->data_len, event->data);
 
             /**
-             * @brief Send mqtt server information to nodes throught root node.
+             * @brief Receive mqtt server information to nodes throught root node.
              */
             if(strcmp(aux_topic,TOPIC_ENCENDIDO)==0)	//si es que se encendio alguna alarma
             {
             	char *temp_on = NULL,*temp_off = NULL, *send_str = NULL;
 
-            	MDF_LOGD("Node send, size: %d, data: %s", event->data_len,aux_data);
+            	MDF_LOGD("Node receive, size: %d, data: %s", event->data_len,aux_data);
 
             	temp_on = MDF_MALLOC(sizeof(char)*25);
             	temp_off = MDF_MALLOC(sizeof(char)*25);
@@ -90,26 +90,43 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
+                	char* data;
+                	size_t size;
+
 					xSemaphoreGive(alarma_onoff_sem);
 					set_lastState_nvs(1);
 					//Agrego la interrupción para un pin en particular del GPIO
 					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
+					/*
+	                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_ESTADO,"ON");
+	                MDF_LOGI("Enviado: %s",data);
+	                while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
+	                MDF_FREE(data);*/
 					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
                 }
                 else if(strcmp(aux_data,temp_off) == 0)
 				{
+                	char* data;
+                	size_t size;
+
 					gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
 					set_lastState_nvs(0);
 					xSemaphoreTake(alarma_onoff_sem,(TickType_t)1); //si ya esta apagado que no sea bloqueante
+					/*
+	                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_ESTADO,"OFF");
+	                while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
+	                MDF_LOGI("Enviado: %s",data);
+	                MDF_FREE(data);*/
 				}
             	else	//caso que no sea se lo re envio a los nodos
             	{
             	    size_t size   = 0;
             	    char *data    = NULL;
 
-                    size = asprintf(&data,"%s,%s,%s",aux_data,TOPIC_ENCENDIDO,"no hay msj");
+                    size = asprintf(&data,"%s,%s,%s",aux_data,TOPIC_ENCENDIDO,"A");
             		mwifi_root_write(dest_addr, 1, &data_type, data, size, true);
-                    MDF_LOGI("Enviado: %s",data);
+                    MDF_LOGI("Enviado: %s, size:%d",data,size);
+                    free(data);
             		//MDF_ERROR_GOTO(ret != MDF_OK, MEM_FREE, "<%s> mwifi_root_write", mdf_err_to_name(ret));
             	}
         		free(temp_on);
