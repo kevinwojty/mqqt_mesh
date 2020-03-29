@@ -19,7 +19,7 @@ extern const char *TAG2;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern SemaphoreHandle_t pir_sem,alarma_onoff_sem, config_sem;
 extern DRAM_ATTR char CUARTO[20];
-extern QueueHandle_t estado_nodos;
+extern QueueHandle_t estado_nodos_ext,estado_nodos_int;
 
 esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
 {
@@ -91,32 +91,27 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
                 if(strcmp(aux_data,temp_on) == 0)	//Me fijo si el mensaje es para el root
                 {
                 	char* data;
-                	size_t size;
 
 					xSemaphoreGive(alarma_onoff_sem);
 					set_lastState_nvs(1);
 					//Agrego la interrupciÃ³n para un pin en particular del GPIO
 					gpio_isr_handler_add(PIR_PIN, gpio_isr_handler, (void*) PIR_PIN);
-					/*
-	                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_ESTADO,"ON");
-	                MDF_LOGI("Enviado: %s",data);
-	                while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
-	                MDF_FREE(data);*/
-					//xSemaphoreTake(pir_sem,1); //si no hubo movimiento que no sea bloqueante
+					//Envio a la tarea Act_estado la modificación de la alarma
+					asprintf(&data,"%s,/,ON",CUARTO);
+					xQueueSendToBack(estado_nodos_int,data,portMAX_DELAY);
+					free(data);
                 }
                 else if(strcmp(aux_data,temp_off) == 0)
 				{
                 	char* data;
-                	size_t size;
 
 					gpio_isr_handler_remove(PIR_PIN);   //Evito que salte la interrupcion del pir
 					set_lastState_nvs(0);
 					xSemaphoreTake(alarma_onoff_sem,(TickType_t)1); //si ya esta apagado que no sea bloqueante
-					/*
-	                size = asprintf(&data,"%s,%s,%s",CUARTO,TOPIC_ESTADO,"OFF");
-	                while(mwifi_write(NULL, &data_type,data , size, true) != MDF_OK);
-	                MDF_LOGI("Enviado: %s",data);
-	                MDF_FREE(data);*/
+					//Envio a la tarea Act_estado la modificación de la alarma
+					asprintf(&data,"%s,/,OFF",CUARTO);
+					xQueueSendToBack(estado_nodos_int,data,portMAX_DELAY);
+					free(data);
 				}
             	else	//caso que no sea se lo re envio a los nodos
             	{
@@ -137,8 +132,9 @@ esp_err_t mqtt_event_handler_adafuit(esp_mqtt_event_handle_t event)
             }   //Si es movimiento no hago nada ya que yo envie la notificacion
             else if (strcmp(aux_topic,TOPIC_ESTADO) == 0)
             {
-            	xQueueOverwrite(estado_nodos,aux_data);
+            	xQueueOverwrite(estado_nodos_ext,aux_data);
             	ESP_LOGI(TAG2, "Se escribio en la cola: %s",aux_data);
+            	esp_mqtt_client_unsubscribe(clientAdafruit,TOPIC_ESTADO);
             }
             MDF_FREE(aux_topic);
             MDF_FREE(aux_data);
@@ -217,8 +213,9 @@ mdf_err_t event_loop_cb(mdf_event_loop_t event, void *ctx)
 
             if (esp_mesh_is_root())
             {
+                xTaskCreate(root_write_task, "root_write", 5 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
+                xTaskCreate(Act_estado, "Act_estado", 4 * 1024,NULL, 2, NULL);
             	mqtt_app_start();
-                xTaskCreate(root_write_task, "root_write", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
             }
             break;
         }

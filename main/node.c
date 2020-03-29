@@ -17,6 +17,8 @@ extern const char *TAG;
 extern SemaphoreHandle_t alarma_onoff_sem;
 extern esp_mqtt_client_handle_t clientAdafruit;
 extern DRAM_ATTR char CUARTO[20];
+extern QueueHandle_t estado_nodos_int;
+
 
 void root_write_task(void *arg)
 {
@@ -27,9 +29,7 @@ void root_write_task(void *arg)
     mwifi_data_type_t data_type      = {0x0};
     node_msj data;
     const char s[2] = ",";
-	static cJSON *json_nodes = NULL;
 
-	json_nodes=cJSON_CreateObject();
     MDF_LOGI("Root write task is running");
 
     while (mwifi_is_connected() && esp_mesh_get_layer() == MESH_ROOT)
@@ -42,39 +42,35 @@ void root_write_task(void *arg)
 
     	size = asprintf(&rcv,"%.*s",size, temp_rcv);
 
+        MDF_FREE(temp_rcv);
+
         MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %s", MAC2STR(src_addr), size, rcv);
+
 
         //Separo los campos que me enviaron separados por comas
         data.cuarto = strtok(rcv, s);
         data.topic = strtok(NULL, s);
         data.msj = strtok(NULL, s);
 
+        //ESP_LOGI(TAG,"Se recibio %s=%s=%s",data.cuarto,data.topic,data.msj);
+
         if(strcmp(data.topic,TOPIC_ESTADO) == 0)
         {
-        	cJSON *json_cuarto = NULL;
-
-            json_cuarto = cJSON_GetObjectItem(json_nodes, data.cuarto);
-
-            if(cJSON_IsString(json_cuarto))	//significa que ya se encuentra en el json y hay que modificarlo
-			{
-            	cJSON_DeleteItemFromObject(json_nodes,data.cuarto);
-				cJSON_AddStringToObject(json_nodes,data.cuarto,data.msj);
-			}
-            else
-            {
-				cJSON_AddStringToObject(json_nodes,data.cuarto,data.msj);
-            }
-			ESP_LOGI(TAG, "Contenido JSON: %s",cJSON_Print(json_nodes));
+        	char *str_temp = NULL;
+        	asprintf(&str_temp,"%s,/,%s",data.cuarto,data.msj);
+        	xQueueSendToBack(estado_nodos_int,str_temp,portMAX_DELAY);
+        	ESP_LOGI(TAG, "Enviado a la cola");
+        	free(str_temp);
         }
 
-        if(strcmp(data.topic,TOPIC_DISPARO) == 0)
+        else if(strcmp(data.topic,TOPIC_DISPARO) == 0)
         {
         	char alarma[30] = "Alarma en: ";
 
 			strcat(alarma,data.cuarto);
 			esp_mqtt_client_publish(clientAdafruit, data.topic , alarma, 0, 1, 0);
         }
-        MDF_FREE(rcv);
+        free(rcv);
     }
 
     MDF_LOGW("Root write task is exit");
@@ -85,7 +81,7 @@ void root_write_task(void *arg)
 void node_read_task(void *arg)
 {
     mdf_err_t ret = MDF_OK;
-    char *rcv    = NULL;
+    char *rcv = NULL, *rcv_temp = NULL;
     size_t size   = 0;
     mwifi_data_type_t data_type      = {0x0};
     uint8_t src_addr[MWIFI_ADDR_LEN] = {0x0};
@@ -102,9 +98,14 @@ void node_read_task(void *arg)
         }
 
     	size=0;
-        ret = mwifi_read(src_addr, &data_type, &rcv, &size, portMAX_DELAY);
+        ret = mwifi_read(src_addr, &data_type, &rcv_temp, &size, portMAX_DELAY);
         MDF_ERROR_CONTINUE(ret != MDF_OK, "<%s> mwifi_read", mdf_err_to_name(ret));
-        MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %.*s", MAC2STR(src_addr), size,size,rcv);
+
+        size = asprintf(&rcv,"%.*s",size,rcv_temp);
+
+        MDF_FREE(rcv_temp);
+
+        MDF_LOGD("Node receive: " MACSTR ", size: %d, data: %s", MAC2STR(src_addr), size,rcv);
 
         //Separo los campos que me enviaron separados por comas
         data.cuarto = strtok(rcv, s);
@@ -165,7 +166,6 @@ void node_read_task(void *arg)
     }
 
     MDF_LOGW("Node read task is exit");
-    MDF_FREE(rcv);
     vTaskDelete(NULL);
 }
 

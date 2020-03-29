@@ -11,5 +11,7 @@
 void mqtt_app_start(void);
 void get_last_value(esp_mqtt_client_handle_t client,char* topic);
 void state_nodes(void);
+void Act_estado(void *pvParameter);
+
 
 #endif /* HEADERS_MQTT_H_ */

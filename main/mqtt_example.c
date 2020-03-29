@@ -37,7 +37,7 @@ const char *TAG3 = "NVS";
 
 DRAM_ATTR char CUARTO[20] = "default";
 SemaphoreHandle_t pir_sem, alarma_onoff_sem, config_sem;
-QueueHandle_t estado_nodos;
+QueueHandle_t estado_nodos_ext,estado_nodos_int;
 esp_mqtt_client_handle_t clientAdafruit;
 
 /*Tarea para indicar si esta activada o no la alarma*/
@@ -177,7 +177,9 @@ void app_main()
     pir_sem = xSemaphoreCreateBinary();
     alarma_onoff_sem = xSemaphoreCreateBinary();
     config_sem = xSemaphoreCreateBinary();
-    estado_nodos = xQueueCreate(1,sizeof(char)*200);
+    estado_nodos_ext = xQueueCreate(1,sizeof(char)*400);
+    estado_nodos_int = xQueueCreate(3,sizeof(char)*50);
+
 
     if(pir_sem == NULL || alarma_onoff_sem == NULL || config_sem == NULL)
     {
@@ -194,7 +196,7 @@ void app_main()
 
     //Inicializacion de las tareas
     xTaskCreate(node_read_task, "node_read_task", 4 * 1024,NULL, CONFIG_MDF_TASK_DEFAULT_PRIOTY, NULL);
-    xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,2,NULL );
+    xTaskCreate(&LectPir, "LectPir", 4 * 1024,NULL,3,NULL );
     xTaskCreate(&Postled, "Postled", 2048,NULL,1,NULL );
     xTaskCreate(&task_reset_config, "task_reset", 2048,NULL,5,NULL );
 	gpio_isr_handler_add(PUL_BOOT, gpio_isr_handler, (void*) PUL_BOOT);
