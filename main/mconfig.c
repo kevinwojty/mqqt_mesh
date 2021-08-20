@@ -11,6 +11,11 @@
 
 extern const char *TAG;
 
+/*
+*   Configuración del nombre del dispositivo a traves de la aplicación provista por espressif a traves de Bluetooth
+*
+*/
+
 mdf_err_t get_network_config(const char *name, mwifi_config_t *mwifi_config, char custom_data[32])
 {
     MDF_PARAM_CHECK(name);
